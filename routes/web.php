@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -6,4 +7,7 @@ use App\Http\Controllers\PostController;
 Route::get('/', function () {
     return view('welcome');
 });
+
 Route::get('/api/posts', [PostController::class, 'index']);
+
+Route::post('/api/posts', [PostController::class, 'store']);

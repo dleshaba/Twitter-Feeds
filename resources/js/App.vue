@@ -6,15 +6,55 @@
             <p>Explore posts in one place.</p>
         </header>
 
+        <section class="composer">
+            <h2>Create a post</h2>
+
+            <form @submit.prevent="createPost">
+                <label for="author">Your name</label>
+                <input
+                    id="author"
+                    v-model="authorName"
+                    type="text"
+                    placeholder="e.g. Name Surname"
+                    maxlength="255"
+                    required
+                />
+
+                <label for="username">Username</label>
+                <input
+                    id="username"
+                    v-model="username"
+                    type="text"
+                    placeholder="e.g. @email"
+                    maxlength="255"
+                    required
+                />
+
+                <label for="content">What's happening?</label>
+                <textarea
+                    id="content"
+                    v-model="content"
+                    placeholder="Write your post..."
+                    maxlength="5000"
+                    rows="4"
+                    required
+                ></textarea>
+
+                <p class="counter">{{ content.length }}/5000</p>
+
+                <p v-if="formError" class="error">{{ formError }}</p>
+
+                <button type="submit" :disabled="saving">
+                    {{ saving ? 'Publishing...' : 'Publish post' }}
+                </button>
+            </form>
+        </section>
+
         <section class="feed">
             <h2>Latest Posts</h2>
 
             <p v-if="loading">Loading posts...</p>
-
-            <p v-else-if="error" class="error">
-                {{ error }}
-            </p>
-
+            <p v-else-if="error" class="error">{{ error }}</p>
             <p v-else-if="posts.length === 0">
                 No posts yet. Be the first to post!
             </p>
@@ -25,12 +65,7 @@
                 class="post"
             >
                 <div class="avatar">
-                    <img
-                        v-if="post.avatar_url"
-                        :src="post.avatar_url"
-                        :alt="post.author_name"
-                    />
-                    <span v-else>{{ getInitials(post.author_name) }}</span>
+                    {{ getInitials(post.author_name) }}
                 </div>
 
                 <div class="post-content">
@@ -41,7 +76,9 @@
 
                     <p>{{ post.content }}</p>
 
-                    <small>{{ formatDate(post.posted_at || post.created_at) }}</small>
+                    <small>
+                        {{ formatDate(post.posted_at || post.created_at) }}
+                    </small>
                 </div>
             </article>
         </section>
@@ -51,17 +88,21 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 
-// Stores the posts received from Laravel.
 const posts = ref([]);
-
-// Controls the loading message.
 const loading = ref(true);
-
-// Stores an error if the request fails.
 const error = ref('');
 
-// Runs automatically when the Vue component loads.
-onMounted(async () => {
+const authorName = ref('');
+const username = ref('');
+const content = ref('');
+
+const saving = ref(false);
+const formError = ref('');
+
+async function loadPosts() {
+    loading.value = true;
+    error.value = '';
+
     try {
         const response = await fetch('/api/posts');
 
@@ -72,17 +113,61 @@ onMounted(async () => {
         posts.value = await response.json();
     } catch (err) {
         console.error(err);
-        error.value = 'Could not load posts. Please check your Laravel server.';
+        error.value = 'Could not load posts. Please try again.';
     } finally {
         loading.value = false;
     }
-});
+}
 
-// Creates initials such as "JD" from "Jane Doe".
-function getInitials(name) {
-    if (!name) {
-        return '?';
+async function createPost() {
+    formError.value = '';
+    saving.value = true;
+
+    try {
+        const response = await fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                author_name: authorName.value.trim(),
+                username: username.value.trim(),
+                content: content.value.trim(),
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            if (response.status === 422 && data.errors) {
+                formError.value = Object.values(data.errors)
+                    .flat()
+                    .join(' ');
+            } else {
+                formError.value = data.message || 'Could not publish the post.';
+            }
+
+            return;
+        }
+
+        // Add the saved post to the top of the feed.
+        posts.value.unshift(data);
+
+        // Clear the form after successful publishing.
+        authorName.value = '';
+        username.value = '';
+        content.value = '';
+    } catch (err) {
+        console.error(err);
+        formError.value = 'Could not connect to Laravel. Please try again.';
+    } finally {
+        saving.value = false;
     }
+}
+
+function getInitials(name) {
+    if (!name) return '?';
 
     return name
         .split(' ')
@@ -92,14 +177,13 @@ function getInitials(name) {
         .toUpperCase();
 }
 
-// Converts the database date into a readable date and time.
 function formatDate(dateString) {
-    if (!dateString) {
-        return 'Date unavailable';
-    }
+    if (!dateString) return 'Date unavailable';
 
     return new Date(dateString).toLocaleString();
 }
+
+onMounted(loadPosts);
 </script>
 
 <style scoped>
@@ -126,6 +210,60 @@ function formatDate(dateString) {
     color: #657786;
 }
 
+.composer {
+    margin-top: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.composer form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.composer label {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.composer input,
+.composer textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.composer textarea {
+    resize: vertical;
+}
+
+.counter {
+    margin: 0;
+    text-align: right;
+    font-size: 12px;
+    color: #657786;
+}
+
+.composer button {
+    align-self: flex-start;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 20px;
+    background: #1d9bf0;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.composer button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .feed {
     margin-top: 24px;
 }
@@ -144,17 +282,10 @@ function formatDate(dateString) {
     flex-shrink: 0;
     width: 44px;
     height: 44px;
-    overflow: hidden;
     border-radius: 50%;
     background: #dbeafe;
     color: #1d4ed8;
     font-weight: bold;
-}
-
-.avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
 }
 
 .post-content h3 {
