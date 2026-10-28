@@ -1,3 +1,4 @@
+
 <template>
     <main class="page">
         <header class="header">
@@ -8,27 +9,97 @@
         <section class="feed">
             <h2>Latest Posts</h2>
 
-            <article class="post">
-                <div class="avatar">TL</div>
+            <p v-if="loading">Loading posts...</p>
+
+            <p v-else-if="error" class="error">
+                {{ error }}
+            </p>
+
+            <p v-else-if="posts.length === 0">
+                No posts yet. Be the first to post!
+            </p>
+
+            <article
+                v-for="post in posts"
+                :key="post.id"
+                class="post"
+            >
+                <div class="avatar">
+                    <img
+                        v-if="post.avatar_url"
+                        :src="post.avatar_url"
+                        :alt="post.author_name"
+                    />
+                    <span v-else>{{ getInitials(post.author_name) }}</span>
+                </div>
 
                 <div class="post-content">
-                    <h3>Tshepo Leshabane <span>@tshepoleshabane</span></h3>
-                    <p>
-                        Welcome to Twitter Feeds! This is our first post
-                        displayed using Vue.js.
-                    </p>
-                    <small>Just now</small>
+                    <h3>
+                        {{ post.author_name }}
+                        <span>{{ post.username }}</span>
+                    </h3>
+
+                    <p>{{ post.content }}</p>
+
+                    <small>{{ formatDate(post.posted_at || post.created_at) }}</small>
                 </div>
             </article>
-
-            <p class="note">
-                Sample post.
-            </p>
         </section>
     </main>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue';
+
+// Stores the posts received from Laravel.
+const posts = ref([]);
+
+// Controls the loading message.
+const loading = ref(true);
+
+// Stores an error if the request fails.
+const error = ref('');
+
+// Runs automatically when the Vue component loads.
+onMounted(async () => {
+    try {
+        const response = await fetch('/api/posts');
+
+        if (!response.ok) {
+            throw new Error('Failed to load posts.');
+        }
+
+        posts.value = await response.json();
+    } catch (err) {
+        console.error(err);
+        error.value = 'Could not load posts. Please check your Laravel server.';
+    } finally {
+        loading.value = false;
+    }
+});
+
+// Creates initials such as "JD" from "Jane Doe".
+function getInitials(name) {
+    if (!name) {
+        return '?';
+    }
+
+    return name
+        .split(' ')
+        .map(part => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+}
+
+// Converts the database date into a readable date and time.
+function formatDate(dateString) {
+    if (!dateString) {
+        return 'Date unavailable';
+    }
+
+    return new Date(dateString).toLocaleString();
+}
 </script>
 
 <style scoped>
@@ -51,8 +122,7 @@
 
 .header p,
 .post-content h3 span,
-.post-content small,
-.note {
+.post-content small {
     color: #657786;
 }
 
@@ -74,10 +144,17 @@
     flex-shrink: 0;
     width: 44px;
     height: 44px;
+    overflow: hidden;
     border-radius: 50%;
     background: #dbeafe;
     color: #1d4ed8;
     font-weight: bold;
+}
+
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .post-content h3 {
@@ -92,10 +169,15 @@
 
 .post-content p {
     line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
-.note {
-    margin-top: 20px;
-    font-size: 13px;
+.post-content small {
+    font-size: 12px;
+}
+
+.error {
+    color: #dc2626;
 }
 </style>
