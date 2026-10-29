@@ -74,11 +74,65 @@
                         <span>{{ post.username }}</span>
                     </h3>
 
-                    <p>{{ post.content }}</p>
+                    
+                    <div v-if="editingPostId === post.id" class="edit-form">
+                        <textarea
+                            v-model="editContent"
+                            maxlength="5000"
+                            rows="4"
+                            required
+                        ></textarea>
+
+                        <p v-if="editError" class="error">{{ editError }}</p>
+
+                        <div class="edit-actions">
+                            <button
+                                type="button"
+                                @click="updatePost(post.id)"
+                                :disabled="savingEdit"
+                            >
+                                {{ savingEdit ? 'Saving...' : 'Save changes' }}
+                            </button>
+
+                            <button
+                                type="button"
+                                class="cancel-button"
+                                @click="cancelEdit"
+                                :disabled="savingEdit"
+                            >
+                                Cancel
+                            </button>
+                            
+                            
+
+                        </div>
+                    </div>
+
+                    <div v-else>
+                        <p>{{ post.content }}</p>
+
+                        <button
+                            type="button"
+                            class="edit-button"
+                            @click="startEdit(post)"
+                        >
+                            Edit
+                        </button>
+
+                        <button
+                                type="button"
+                                class="delete-button"
+                                @click="deletePost(post.id)"
+                                :disabled="deletingPostId === post.id"
+                            >
+                                {{ deletingPostId === post.id ? 'Deleting...' : 'Delete' }}
+                            </button>
+                    </div>
 
                     <small>
                         {{ formatDate(post.posted_at || post.created_at) }}
                     </small>
+
                 </div>
             </article>
         </section>
@@ -98,6 +152,111 @@ const content = ref('');
 
 const saving = ref(false);
 const formError = ref('');
+
+const editingPostId = ref(null);
+const editContent = ref('');
+const savingEdit = ref(false);
+const editError = ref('');
+
+const deletingPostId = ref(null);
+
+
+async function deletePost(postId) {
+    const confirmed = window.confirm(
+        'Are you sure you want to delete this post?'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    deletingPostId.value = postId;
+
+    try {
+        const response = await fetch(`/api/posts/${postId}`, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+            },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Could not delete the post.');
+        }
+
+        posts.value = posts.value.filter(post => post.id !== postId);
+    } catch (err) {
+        console.error(err);
+        window.alert(err.message || 'Could not connect to Laravel.');
+    } finally {
+        deletingPostId.value = null;
+    }
+}
+
+function startEdit(post) {
+    editingPostId.value = post.id;
+    editContent.value = post.content;
+    editError.value = '';
+}
+
+function cancelEdit() {
+    editingPostId.value = null;
+    editContent.value = '';
+    editError.value = '';
+}
+
+async function updatePost(postId) {
+    editError.value = '';
+
+    if (!editContent.value.trim()) {
+        editError.value = 'Post content cannot be empty.';
+        return;
+    }
+
+    savingEdit.value = true;
+
+    try {
+        const response = await fetch(`/api/posts/${postId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                content: editContent.value.trim(),
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            if (response.status === 422 && data.errors) {
+                editError.value = Object.values(data.errors)
+                    .flat()
+                    .join(' ');
+            } else {
+                editError.value = data.message || 'Could not update the post.';
+            }
+
+            return;
+        }
+
+        const index = posts.value.findIndex(post => post.id === postId);
+
+        if (index !== -1) {
+            posts.value[index] = data;
+        }
+
+        cancelEdit();
+    } catch (err) {
+        console.error(err);
+        editError.value = 'Could not connect to Laravel. Please try again.';
+    } finally {
+        savingEdit.value = false;
+    }
+}
 
 async function loadPosts() {
     loading.value = true;
@@ -311,4 +470,67 @@ onMounted(loadPosts);
 .error {
     color: #dc2626;
 }
+
+
+.edit-form {
+    width: 100%;
+}
+
+.edit-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font: inherit;
+    resize: vertical;
+}
+
+.edit-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.edit-button,
+.edit-actions button {
+    padding: 7px 14px;
+    border: none;
+    border-radius: 18px;
+    background: #1d9bf0;
+    color: white;
+    cursor: pointer;
+}
+
+.edit-button {
+    margin-bottom: 10px;
+}
+
+.edit-actions .cancel-button {
+    background: #e5e7eb;
+    color: #17202a;
+}
+
+.edit-actions button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
+.delete-button {
+    margin-left: 8px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 18px;
+    background: #fee2e2;
+    color: #b91c1c;
+    cursor: pointer;
+}
+
+.delete-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
 </style>

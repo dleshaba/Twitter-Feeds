@@ -33,4 +33,28 @@ class PostController extends Controller
 
         return response()->json($post, 201);
     }
+
+    // Update an existing post.
+    public function update(Request $request, Post $post)
+    {
+        $validated = $request->validate([
+            'content' => 'required|string|max:5000',
+        ]);
+
+        $post->update([
+            'content' => $validated['content'],
+        ]);
+
+        return response()->json($post);
+    }
+
+    // Delete an existing post.
+    public function destroy(Post $post)
+    {
+        $post->delete();
+
+        return response()->json([
+            'message' => 'Post deleted successfully.',
+        ]);
+    }
 }

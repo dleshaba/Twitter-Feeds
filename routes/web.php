@@ -11,3 +11,8 @@ Route::get('/', function () {
 Route::get('/api/posts', [PostController::class, 'index']);
 
 Route::post('/api/posts', [PostController::class, 'store']);
+
+Route::put('/api/posts/{post}', [PostController::class, 'update']);
+
+Route::delete('/api/posts/{post}', [PostController::class, 'destroy']);
+
