@@ -61,9 +61,13 @@
             <p v-else-if="posts.length === 0">
                 No posts yet. Be the first to post!
             </p>
+            <p v-else-if="filteredPosts.length === 0">
+                No matching posts found. Try another search.
+            </p>
+            
 
             <article
-                v-for="post in posts"
+                v-for="post in filteredPosts"
                 :key="post.id"
                 class="post"
             >
@@ -131,7 +135,8 @@
                                 {{ deletingPostId === post.id ? 'Deleting...' : 'Delete' }}
                             </button>
                     </div>
-
+<button>Like</button>
+<span>{{ post.likes }}</span>
                     <small>
                         {{ formatDate(post.posted_at || post.created_at) }}
                     </small>
@@ -146,6 +151,17 @@
 import { ref, onMounted, computed } from 'vue';
 
 const posts = ref([]);
+const query = ref('');
+
+const filteredPosts = computed(() => {
+    return posts.value.filter(post => {
+        return (
+            post.author_name.toLowerCase().includes(query.value.toLowerCase()) ||
+            post.content.toLowerCase().includes(query.value.toLowerCase())
+        );
+    });
+});
+
 const loading = ref(true);
 const error = ref('');
 
@@ -163,8 +179,6 @@ const editError = ref('');
 
 const deletingPostId = ref(null);
 
-//searchbar
-const query = ref('');
 
 async function deletePost(postId) {
     const confirmed = window.confirm(
@@ -346,6 +360,7 @@ function formatDate(dateString) {
 
     return new Date(dateString).toLocaleString();
 }
+
 
 onMounted(loadPosts);
 </script>
