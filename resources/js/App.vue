@@ -5,6 +5,9 @@
             <h1>Twitter Feeds</h1>
             <p>Explore posts in one place.</p>
         </header>
+        <section>
+            <input type="text" placeholder="Search" v-model="query">
+        </section>
 
         <section class="composer">
             <h2>Create a post</h2>
@@ -140,7 +143,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 
 const posts = ref([]);
 const loading = ref(true);
@@ -160,6 +163,8 @@ const editError = ref('');
 
 const deletingPostId = ref(null);
 
+//searchbar
+const query = ref('');
 
 async function deletePost(postId) {
     const confirmed = window.confirm(
